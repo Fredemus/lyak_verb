@@ -280,39 +280,6 @@ impl Delay {
         self.index += 1;
         out
     }
-
-    /// for testing
-    fn _process2(&mut self, input: f32) -> f32 {
-        if self.index >= self.buffer.len() {
-            self.index = 0
-        }
-        println!("index1: {}", self.index);
-        // println!("index2: {}", self.index as i32 - self.dly_len as i32);
-
-        let out: f32;
-        // this if-statement implements circularbuffer-like behavior
-        // makes sure we iterate to the right sample
-        if self.index < self.dly_len {
-            // if (self.buffer.len() as i32 + self.index as i32 - self.dly_len as i32) < 0 {
-            //     println!("buffer len: {} index: {}, dly_len: {}, ", self.buffer.len(), self.index, self.dly_len)
-            // }
-            out = self.buffer[(self.buffer.len() + self.index - self.dly_len)];
-            println!(
-                "index2: {}",
-                self.buffer.len() as i32 + self.index as i32 - self.dly_len as i32
-            );
-        } else {
-            out = self.buffer[(self.index - self.dly_len)];
-            println!("index2: {}", self.index - self.dly_len);
-        }
-        self.buffer[self.index] = input;
-
-        // subtract output sample at some level to buffer here for negative feedback
-        self.buffer[self.index] -= self.feedback * out;
-
-        self.index += 1;
-        out
-    }
 }
 impl Default for Delay {
     fn default() -> Delay {
