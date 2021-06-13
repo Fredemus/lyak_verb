@@ -1,7 +1,6 @@
 /// Consider expanding the project to 4 dimensions for the hell of it lol
 
-// TODO: refactor feedback filters so they use fc directly. The current way is a mess and constantly sets it unnecessarily
-// TODO: Program still stalls on build_impulse() at times, albeit rarely. 
+// TODO: refactor feedback filters so they use fc directly. The current way sets them unnecessarily
 // Could fix/find problem by counting iterations of while loop 
 #[macro_use]
 extern crate vst;
@@ -13,7 +12,6 @@ mod util;
 use crate::util::{AtomicBool, AtomicF32};
 mod algorithmic_verb;
 mod raytrace;
-// TODO: For now, early_ir is limited to 2048 samples. Is that reasonable?
 /// 2048 samples chosen since it seems a reasonable upper bound for early reflections and would work well with
 /// frequency domain convolution
 const MAX_IR_LEN: usize = 2048;
@@ -39,7 +37,6 @@ struct Parameters {
     diffusion: AtomicF32,
     damping: AtomicF32,
     mix: AtomicF32,
-    // TODO: How do we handle p_mic and p_lspk? not parameters for now
     sample_rate: AtomicF32,
     /// used for notifying process that the IR should be recalculated
     params_changed: AtomicBool,
@@ -79,7 +76,7 @@ impl LyakVerb {
         }
         return convolved;
     }
-    // TODO: The system still ends up getting loud at extreme settings for room size,
+    // The system still ends up getting louder at extreme settings for room size,
     // presumably either because energy leaves the early_ir because of the size or more energy in late reflections,
     // should be fixed at some point
     /// used to avoid wet signals getting too loud when there's a lot of energy in the impulse response
@@ -88,11 +85,10 @@ impl LyakVerb {
         for i in 0..self.raytrace.early_ir.len() {
             power += self.raytrace.early_ir[i].powi(2);
         }
-        // ref_power works pretty well to normalize the wet signal, but could potentially be fine tuned more
+        // ref_power works pretty well to normalize the wet signal, but could potentially be fine-tuned more
         let ref_power = 3.;
-
         let normalize_factor = ref_power / power;
-        // println!("normalizing with factor: {}", normalize_factor);
+
         self.gain_factor = normalize_factor;
         // self.gain_factor = 0.0631;
     }
@@ -127,9 +123,7 @@ impl PluginParameters for Parameters {
             _ => (),
         }
         // this is only necessary for some parameters, hence the if statement
-        // TODO: the index < 5 can be used to avoid rebuilding impulse for damping, but might require another flag
         if index > 1
-        /*&& index < 5*/
         {
             self.params_changed.set(true);
         }
@@ -279,56 +273,7 @@ impl Plugin for LyakVerb {
 }
 
 plugin_main!(LyakVerb);
-// simple test for debugging. used for checking if a variable has the expected value
-// has to be run with cargo test -- --nocapture or the println! will be suppressed
-#[test]
-fn test_variable_value() {
-    // for i in 0..20 {
-    //     for j in 0..20 {
-    //         println!("{}", 20 * i + j)
-    //     }
-    // }
-
-    let mut plugin = LyakVerb::default();
-    // for i in 0..6 {
-    //     println!("plane: {:?}", plugin.raytrace.get_plane(i));
-    // }
-    plugin.params.length.set(5.);
-    plugin.params.width.set(4.);
-    plugin.params.height.set(3.);
-    plugin.raytrace.set_planes();
-    // for i in 0..6 {
-    //     println!("plane: {:?}", plugin.raytrace.get_plane(i));
-    // }
-    plugin.raytrace.build_impulse();
-    plugin.algoverb.adjust();
-    // println!("before: {:?}", plugin.raytrace.early_ir);
-    // println!("after: {:?}", plugin.raytrace.early_ir);
-
-    println!("RT60: {}", plugin.algoverb.rt60);
-    // let buffer = mut vst::buffer::AudioBuffer<'_, f32>
-    // let mut input_sample = 1.;
-    // let mix = plugin.params.mix.get();
-    // println!("initial_delay: {} {} {}", plugin.algoverb.initial_delay.index);
-
-    // let mut output_sample: f32;
-    // for i in 0..5000 {
-    //     // plugin.sample_buffer.push_back(input_sample);
-    //     // // summing output of the 2 reverbs
-    //     // let wet = plugin.single_convolve() + plugin.algoverb.process(input_sample);
-    //     let wet = plugin.algoverb.process(input_sample);
-
-    //     // plugin.sample_buffer.pop_front();
-    //     // mixing wet and dry signal
-    //     output_sample = wet * mix + input_sample * (1. - mix);
-    //     println!("audio out: {}", output_sample);
-    //     if wet.abs() > 0. {
-    //         println!("sample at {}", i);
-    //     }
-    //     input_sample = 0.;
-    // }
-    // println!("impulse: {:?}", plugin.raytrace.early_ir);
-}
+/// used to verify that delay lens are reasonable at different room sizes
 #[test]
 fn test_dly_lens() {
     let mut plugin = LyakVerb::default();

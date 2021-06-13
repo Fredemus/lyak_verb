@@ -20,7 +20,6 @@ fn dist(x: &[f32; 3], y: &[f32; 3]) -> f32 {
     ((x[0] - y[0]).powi(2) + (x[1] - y[1]).powi(2) + (x[2] - y[2]).powi(2)).sqrt()
 }
 
-// TODO: At some point the rounding errors get ridiculous. Might be a good idea to round the collision at the plane it hits
 
 // These are only good in a very limited range, but that covers the range of shoot_rays
 // Initial criterion benchmarking implies these are 4 times faster than the built-in functions
@@ -40,8 +39,7 @@ fn cheap_cos(x: f32) -> f32 {
         + 0.2480158730e-4 * x.powi(8)
         - 0.0000002755731922 * x.powi(10)
 }
-// TODO: IMPORTANT: It is definitely possible to add SIMD extensions, which would give a fat speed boost
-// TODO: Raytrace needs to share params with AlgorithmicTail <- should be handled, but stays until verified
+// It is definitely possible to add SIMD extensions, which would give a fat speed boost
 pub struct RayTrace {
     pub(crate) params: Arc<Parameters>,
     // rng: rand::prelude::ThreadRng,
@@ -103,11 +101,10 @@ impl RayTrace {
         let mut cum_dist: f32;
         let mut ray_dir: [f32; 3];
 
-        // TODO: l,m,n doesn't need to be mutable if we remove the "for _x in 0..10" for loop
+        // TODO: l,m,n doesn't need to be mutable if we remove the "for _x in 0..3" for loop
         let mut l: [f32; 400];
         let mut m: [f32; 400];
         let mut n: [f32; 400];
-        // TODO: 10 is probably overkill here
         for _x in 0..3 {
             // Creating the rays
             let mut rng = rand::thread_rng();
@@ -170,7 +167,6 @@ impl RayTrace {
                             // distance
                             cum_dist = cum_dist + dist(&start_point, &col_point);
                             // breaking while loop early
-                            // TODO: is there a better way? break will only break for loop it seems
                             if cum_dist > max_dist {
                                 last_plane = 10;
                                 w_ray = 0.;
@@ -243,11 +239,6 @@ impl RayTrace {
         (l, m, n)
     }
 
-    // How to pass i and j into this?
-    // TODO: this version of shooting rays can potentially be used for optimization
-    // fn gen_ray(rnd1: f32, rnd2: f32) -> [f32;3] {
-    //     [2.*((i+rnd1)/20. - ((i+rnd1)/20.).powi(2)).sqrt() * (2.*PI*(j+rnd2)/20.).cos(), 2.*((i+rnd1)/20. - ((i+rnd1)/20.).powi(2)).sqrt() * (2.*PI*(j+rnd2)/20.).sin(), 1. - 2.*(i+rnd1)/20.]
-    // }
     #[inline(always)]
     fn get_plane(&self, i: usize) -> &[f32; 4] {
         match i {
@@ -279,8 +270,6 @@ impl RayTrace {
         self.top[3] = -(z * 1.);
     }
 
-
-    // TODO: Should [f32;3] be a ref?
     fn get_reflected_ray(&self, ray_dir: &[f32; 3], plane: &[f32; 4], rnd1: f32) -> [f32; 3] {
         let mut new_ray_dir = [0.; 3];
         // ray direction is a normal specular reflection
@@ -394,9 +383,3 @@ fn collision_check() {
 
     println!("{}", raytrace.check_valid_collision(start_point));
 }
-// TODO: Test find_collision function here?
-// #[test]
-// fn collision_check2() {
-//     let raytrace = RayTrace::default();
-
-// }

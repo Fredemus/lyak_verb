@@ -1,8 +1,6 @@
 /// the plan atm is to have this running in parallel with RayTrace
 /// The end of the early reflections will be approximated somehow
 /// and the output of this will be delayed with that many samples
-// TODO: Pretty sure the delay is not perfectly robust (delay len won't be right when len gets lower and vec doesn't shrink)
-// TODO: The schroeder allpass doesn't work at all for some reason? Maybe it does need the +x after all
 use super::{Parameters, ABSORPTIONS, MAX_IR_LEN};
 use std::f32::consts::{E, PI};
 use std::sync::Arc;
@@ -224,7 +222,6 @@ impl CombFilter {
         self.dly_len = len;
         self.index = len
     }
-    // TODO: The initial delay doesn't work. Index probably has to start at same value as dly_len
     fn process(&mut self, input: f32) -> f32 {
         if self.index >= self.buffer.len() {
             self.index = 0
@@ -247,7 +244,6 @@ impl CombFilter {
     }
 }
 
-// TODO: replace index and big if-statement with read_index and write_index?
 #[derive(Clone)]
 pub struct Delay {
     dly_len: usize,
@@ -352,8 +348,33 @@ impl SchroederAllpass {
         out
     }
 }
+// this version has a feedback filter in the delay loop. The phase change in the delay loop leads to some 
+// resonance behavior that currently isn't completely understood
+#[allow(dead_code)]
+struct SchroederAllpassFbFilter {
+    delay: CombFilter,
+    g: f32,
+}
+#[allow(dead_code)]
+impl SchroederAllpassFbFilter {
+    fn new(g: f32, dly_len: usize) -> SchroederAllpass {
+        let mut delay = Delay {
+            dly_len,
+            feedback: -g,
+            ..Default::default()
+        };
+        delay.set_dly_len(dly_len);
+        SchroederAllpass { delay, g }
+    }
+    fn process(&mut self, input: f32) -> f32 {
+        let delay_out = self.delay.process(input);
 
-// use log_panics;
+        let out = delay_out * (1. - self.g.powi(2)) - input * self.g;
+
+        out
+    }
+}
+
 /// used to verify if delays work as intended
 #[test]
 fn test_delay() {
@@ -472,6 +493,8 @@ fn save_schroeder_ap_impulse() {
     let x = 1.;
     let mut algo_verb = AlgorithmicVerb::default();
     algo_verb.set_comb_filters(x, x, x);
+    let mut sc_ap = SchroederAllpassFbFilter::new(0.973, 122);
+    // let mut sc_ap = SchroederAllpassFbFilter::new(0.707, 113);
     // setting up hound for creating .wav files
     use hound;
     let spec = hound::WavSpec {
@@ -481,7 +504,7 @@ fn save_schroeder_ap_impulse() {
         sample_format: hound::SampleFormat::Float,
     };
     let mut writer =
-        hound::WavWriter::create(format!("testing/schroeder_ap_all.wav"), spec).unwrap();
+        hound::WavWriter::create(format!("testing/schroeder_ap3_fbfilter_2.wav"), spec).unwrap();
 
     let len = 10000;
     // let mut impulse = vec![0.;len];
@@ -489,13 +512,7 @@ fn save_schroeder_ap_impulse() {
     // saving samples to wav file
     for _i in 0..len {
         writer
-            .write_sample(
-                algo_verb.sc_ap3.process(
-                    algo_verb
-                        .sc_ap2
-                        .process(algo_verb.sc_ap1.process(input_sample)),
-                ),
-            )
+            .write_sample(sc_ap.process(input_sample))
             .unwrap();
         input_sample = 0.;
     }
